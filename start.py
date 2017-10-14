@@ -52,4 +52,4 @@ headings = count_vect.vocabulary_
 #data is divided into training and validation sets
 #I will reformat the test set when we sit down to test the algos together so we can benchmark the final algos
 
-X_train, X_valid, y_train, y_valid = train_test_split(traincounts, data['Target'], test_size=0.20, random_state = seed)
+X_train, X_valid, y_train, y_valid = train_test_split(traincounts, np.array(data['Target']), test_size=0.20, random_state = seed)
