@@ -30,6 +30,7 @@ def evalTest(X,Y,Test,classCount):
 
     sampleCount = len(Y)
 
+    # sortLabels are false if sample failed test and true o.w.
     sortLabels = Test.splitData(X)
 
     HA = 0
@@ -38,6 +39,7 @@ def evalTest(X,Y,Test,classCount):
     nA = sum(sortLabels)
     nB = sampleCount - nA
 
+    # Calculate entropy
     for y in range(0,classCount):
         pA = sum([a == y and b for a, b in zip(Y,sortLabels)])
         pB = sum([a == y and not b for a, b in zip(Y,sortLabels)])
@@ -50,7 +52,7 @@ def evalTest(X,Y,Test,classCount):
         else:
             HB += -pB/nB*log(pB/nB)/log(2)
 
-
-    CondEntropy = (HA/nA + HB/nB)/sampleCount
+    # Calculate conditional entropy for passing/failing test
+    CondEntropy = (HA*nA + HB*nB)/sampleCount
 
     return [sortLabels,CondEntropy]
