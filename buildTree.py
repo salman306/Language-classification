@@ -1,16 +1,72 @@
 import numpy as np
 import random
-from math import log
+from math import log, floor
+
+def getRandomForest(X,Y,K,classCount,M)
+
+    """ 
+        X is the training parameters (n x m matrix)
+        Y is the training labels (n x 1 matrix)
+        K is the number of parameters considered at each node
+        classCount is the number of unique classes in Y
+        M is the number of subsets we divide our data into
+    """
+    a,b = np.shape(X)
+
+    # Get random permutation 
+    randPerm = np.random.permutation(range(a))
+
+    # Get size of each bag
+    bagSize = floor(a/M)
+
+    # Divide data randomly into M bags and create random tree for each
+    for m in range(M):
+        bag = randPerm[m*bagSize:min((m+1)*bagSize,a-1)]
+        randomForest[m] = buildTree(X[bag,:],Y[bag],classCount,K)
+
+    return randomForest
+
+def treeClassify(A,N):
+    # If not a leaf, test data against node's function
+    if(N.Label == None):
+        t = N.test(A)
+        if(t == 0):
+            return treeClassify(A,N.leftChild)
+        else:
+            return treeClassify(A,N.rightChild)
+    # Else return the class of the leaf
+    else:
+        return N.Label
+
+def buildTree(X,Y,classCount,k):
+    # If Y contains a single class create a leaf node
+    for i in range(0,classCount):
+        if(sum(abs(Y-i)) == 0):
+            return Node(Label=i)
+    # Otherwise create a node and two children for the split data
+    n = Node(X,Y,k,classCount) 
+    n.leftChild = buildTree(X[n.div],Y[n.div],classCount,k)
+    n.rightChild = buildTree(X[~n.div],Y[~n.div],classCount,k)
+    n.leftChild.parent = n
+    n.rightChild.parent = n
+    return n
+
 
 class Node(object):
-    """docstring for Node"""
-    def __init__(self, X = None, Y = None, k = None, Label = None):
+    """ 
+        X is the training parameters (n x m matrix)
+        Y is the training labels (n x 1 matrix)
+        K is the number of parameters considered at each node
+        If Y is one class, Label is this class
+        Intializes with the test function with highest information gain
+    """
+    def __init__(self, X = None, Y = None, k = None, classCount = None, Label = None):
         self.leftChild = None
         self.rightChild = None
         self.parent = None
         self.Label = Label
         if(Label == None):
-            self.Thresh, self.feature, self.div = findBestF(X,Y,k)
+            self.Thresh, self.feature, self.div = findBestF(X,Y,k,classCount)
         else:
             self.F = None
             self.div = None
@@ -19,20 +75,7 @@ class Node(object):
         sortLabels = X[:,self.feature] < self.Thresh
         return sortLabels
 
-def buildTree(X,Y,classCount,k):
-    for i in range(0,classCount):
-        if(sum(abs(Y-i)) == 0):
-            return Node(Label=i)
-    n = Node(X,Y,k) 
-    n.leftChild = buildTree(X[n.div],Y[n.div],classCount,k)
-    n.rightChild = buildTree(X[~n.div],Y[~n.div],classCount,k)
-    n.leftChild.parent = n
-    n.rightChild.parent = n
-    return n
-
-def findBestF(X,Y,k):
-
-    classCount = 5
+def findBestF(X,Y,k,classCount):
 
     a,b = np.shape(X)
     J = random.sample(range(b),k)
@@ -77,6 +120,7 @@ def findBestF(X,Y,k):
     return bestT, bestF, bestDiv
 
 def DFS(N):
+    """ Counts numer of nodes """
     if(N.leftChild == None):
         if(N.rightChild == None):
             return 1
@@ -92,12 +136,3 @@ def DFS(N):
         n2 = DFS(N.leftChild)
     return n1 + n2 + 1
 
-def treeClassify(A,N):
-    if(N.Label == None):
-        t = N.test(A)
-        if(t == 0):
-            return treeClassify(A,N.leftChild)
-        else:
-            return treeClassify(A,N.rightChild)
-    else:
-        return N.Label
