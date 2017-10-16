@@ -26,17 +26,23 @@ data['Text'] = map(str, data['Text'])
 # removing spaces between words to create list of characters
 temp = []
 characterarray = []
-
+alphabetSet=set()
 for utterance in data['Text']:
     for counter in utterance:
         if ((counter != ' ') and (counter.isdigit() == False) and (counter != '.')):
             if counter.isupper():
                 temp.append(counter.lower())
+                alphabetSet.add(counter.lower())
             else:
                 temp.append(counter)
+                alphabetSet.add(counter.lower())
     characterarray.append(temp)
     temp = []
-
+alphabetSet=list(alphabetSet)
+alphabetSet.sort()
+alphabetMapping=dict()
+for i in range(len(alphabetSet)):
+    alphabetMapping[alphabetSet[i]]=i 
 
 finalform = []
 for counter in characterarray:
