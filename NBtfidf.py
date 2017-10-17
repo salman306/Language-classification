@@ -27,12 +27,11 @@ tagCount,tagProb=getProbs_Yi()
 p(char='a'|language=1)=
 (sum(tfidf_Weights of 'a' for all language=1 )+1)
 /(
-total size of alphabet for language=1 +sum(tfidf_Weights of 'a' for all language=1 )
+total size of utterance for language=1 +sum(tfidf_Weights of 'a' for all language=1 )
 +sum(tfidf_Weights of 'b' for all language=1 )+... (for all alphabet of language=1)
 )
 """
-#'\x98'
-# '\x9f' '\xad' '\xf0'
+
 def getProbs_XjGivenYi():
     ALPHABETS_SIZE=len(ALPHABETS)
     alphabetsFreqGivenYi=dict()
@@ -43,10 +42,7 @@ def getProbs_XjGivenYi():
         if(tagArray[i] not in alphabetsFreqGivenYi):
             alphabetsFreqGivenYi[tagArray[i]]=dict()
         for char in tmp:
-            #change the encoding is critical
-            try:
-                char=char.decode('cp1252')
-            except Exception as e: print(e)
+            #change the encoding is critical)
             if (char in alphabetsFreqGivenYi[tagArray[i]]):
                 alphabetsFreqGivenYi[tagArray[i]][char]+=tfidfTable[i].toarray()[0][ALPHABETS[char]]
             else:
@@ -60,27 +56,34 @@ def getProbs_XjGivenYi():
                 alphabetsFreqGivenYi[0]={'a':11.35,'d':22.2} in this case sum(tfidf_Weights of 'a' for all language=0 )=11.35
                 alphabetsFreqGivenYi[1]={'e':13.21,'q':.5}
                 """
-    # change them to probability
+    #get rid off weight that is too small, they should be treated as noise
+    #after careful examination 5 is chosen
+    weightCutoff=5
+    for k,v in alphabetsFreqGivenYi.iteritems():
+        for kk,vv in v.items():
+            if (vv<weightCutoff):del alphabetsFreqGivenYi[k][kk]
 
-    for k,v in alphabetsFreqGivenYi.items():
+    # re-weight with respect to the total alphabet of a language
+
+    for k,v in alphabetsFreqGivenYi.iteritems():
         for kk,vv in v.items():
             #Laplace smoothing
-            alphabetsFreqGivenYi[k][kk]=(1.0+vv)/(sum(v.values())+len(v))
+            alphabetsFreqGivenYi[k][kk]=(1.0+vv)/(sum(v.values())+tagCount[k])
     return alphabetsFreqGivenYi
 probXjGivenYi=getProbs_XjGivenYi()
 def Predict(charArr):
+    # make charArr contains unique chars since tf idf is already being considered
     charArr=start.np.unique(charArr)
     calculationDict=tagProb.copy()
     for k,v in calculationDict.items():
         tempSum=0
         for char in charArr:
-            try:
-                char=char.decode('cp1252')
-            except Exception as e: print(e)
             if (char in probXjGivenYi[k]):
                 tempSum+=start.np.log(probXjGivenYi[k][char])
             else:
-                tempSum+=start.np.log(1.0/(len(probXjGivenYi[k])+sum(probXjGivenYi[k].values())))
+                tempSum+=start.np.log(1.0/(tagCount[k]+sum(probXjGivenYi[k].values())))
         calculationDict[k]=start.np.log(v)+tempSum
+    # in prodcution mode,the line below should be commented out
     print(calculationDict)
+    # return the language index where max log(probability) occurs
     return max(calculationDict,key=calculationDict.get)
