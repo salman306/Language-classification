@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import start
 from scipy.stats import itemfreq
+import lr
+import pandas as pd
 # reminder of the mapping
 #mapping = {0: 'Slovak', 1: 'French', 2: 'Spanish', 3: 'German', 4: 'Polish'}
 # the tags are stored in start.y_train
@@ -9,8 +11,11 @@ from scipy.stats import itemfreq
 tagArray=start.data['Target']
 charArray=start.characterarray
 tfidfTable=start.traincounts
+tfidfTable4Test=lr.testcounts
 TOTALTURN=len(tagArray)
 ALPHABETS=start.headings
+testx =pd.DataFrame.from_csv('test_set_x.csv')
+testChar=lr.cleaner(testx)
 #function to get probability of Y_i's
 # return a dictionary {0:0.333,1:0.2222}  for example
 def getProbs_Yi():
@@ -71,7 +76,8 @@ def getProbs_XjGivenYi():
             alphabetsFreqGivenYi[k][kk]=(1.0+vv)/(sum(v.values())+tagCount[k])
     return alphabetsFreqGivenYi
 probXjGivenYi=getProbs_XjGivenYi()
-def Predict(charArr):
+#index is the index of the charArr of the whole testset, tfidfTest is the tfidfTable of the testset
+def Predict(charArr,index,tfidfTest):
     # make charArr contains unique chars since tf idf is already being considered
     charArr=start.np.unique(charArr)
     calculationDict=tagProb.copy()
@@ -79,7 +85,10 @@ def Predict(charArr):
         tempSum=0
         for char in charArr:
             if (char in probXjGivenYi[k]):
-                tempSum+=start.np.log(probXjGivenYi[k][char])
+                #weight the charArray to be predicted by the the test tfidf weight
+                weight=tfidfTest[index].toarray()[0][ALPHABETS[char]]
+                print(weight)
+                tempSum+=start.np.log(weight*probXjGivenYi[k][char])
             else:
                 tempSum+=start.np.log(1.0/(tagCount[k]+sum(probXjGivenYi[k].values())))
         calculationDict[k]=start.np.log(v)+tempSum
@@ -87,3 +96,10 @@ def Predict(charArr):
     print(calculationDict)
     # return the language index where max log(probability) occurs
     return max(calculationDict,key=calculationDict.get)
+def predictWrap(charMatrix,tTable):
+    result=[]
+    i=0
+    for utt in charMatrix:
+        result.append(Predict(list(utt),i,tTable))
+        i+=1
+    return result
