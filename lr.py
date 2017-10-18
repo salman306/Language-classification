@@ -7,7 +7,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from collections import Counter
 from sklearn.model_selection import train_test_split
 from sklearn import linear_model, datasets, metrics
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 def cleaner(data):
     data['Text'] = map(str, data['Text'])
