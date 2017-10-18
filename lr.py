@@ -50,7 +50,7 @@ def cleaner2(data):
 
 # data = pd.DataFrame.from_csv('train_set_x.csv')
 # trainresults = pd.DataFrame.from_csv('train_set_y.csv')
-# testx = pd.DataFrame.from_csv('test_set_x.csv')
+testx = pd.DataFrame.from_csv('test_set_x.csv')
 # testy = pd.DataFrame.from_csv('random_baseline.csv')
 #
 #

@@ -4,6 +4,11 @@ from scipy.stats import itemfreq
 import lr
 import pandas as pd
 import numpy as np
+"""
+note I changed something on the lr.py I use
+
+"""
+
 # reminder of the mapping
 #mapping = {0: 'Slovak', 1: 'French', 2: 'Spanish', 3: 'German', 4: 'Polish'}
 # the tags are stored in start.y_train
@@ -12,7 +17,7 @@ import numpy as np
 tagArray=start.data['Target']
 charArray=start.characterarray
 tfidfTable=start.traincounts
-tfidfTable4Test=lr.testcounts
+#tfidfTable4Test=lr.testcounts
 TOTALTURN=len(tagArray)
 ALPHABETS=start.headings
 testChar=lr.testform
@@ -36,7 +41,11 @@ total size of utterance for language=1 +sum(tfidf_Weights of 'a' for all languag
 +sum(tfidf_Weights of 'b' for all language=1 )+... (for all alphabet of language=1)
 )
 """
-
+"""
+Note currently I cached the probability table in a file so that it is faster to run the program
+If you want to redesign the algo for prob table then u need to comment out line 90 and
+uncomment line 88 after u did something in getProbs_XjGivenYi funciton
+"""
 def getProbs_XjGivenYi():
     alphabetsFreqGivenYi=dict()
     for i in range(TOTALTURN):
@@ -85,6 +94,9 @@ def getProbs_XjGivenYi():
 #probability is cached in file
 probXjGivenYi=np.load('probs.npy').item()
 #index is the index of the charArr of the whole testset, tfidfTest is the tfidfTable of the testset
+"""the functions below are using tfidf re-weight on test set
+    result not good, need investigation
+"""
 def Predict(charArr,index,tfidfTest):
     # make charArr contains unique chars since tf idf is already being considered
     charArr=start.np.unique(charArr)
@@ -116,4 +128,67 @@ def predictWrap(charMatrix,tTable):
         result.append(Predict(utt,i,tTable))
         i+=1
     return result
-t=predictWrap(testChar,tfidfTable4Test)
+# t=predictWrap(testChar,tfidfTable4Test)
+
+"""these functions below does not do use tfidf weight for prediction
+and are currently used
+"""
+def Predict2(charArr):
+    # make charArr contains unique chars since tf idf is already being considered
+    charArr=start.np.unique(charArr)
+    calculationDict=tagProb.copy()
+    for k,v in calculationDict.items():
+        tempSum=0
+        for char in charArr:
+            if (char in probXjGivenYi[k]):
+                product=probXjGivenYi[k][char]
+                if(product==0):
+                    product=0.01/(tagCount[k]+1)
+                tempSum+=start.np.log(product)
+            else:
+                # saves time by not doing summation since the summation will be 1
+                # tempSum+=start.np.log(1/(tagCount[k]+sum(probXjGivenYi[k].values())))
+                tempSum+=start.np.log(0.01/(tagCount[k]+1))
+        calculationDict[k]=start.np.log(v)+tempSum
+    # in prodcution mode,the line below should be commented out
+    # print(calculationDict)
+    # return the language index where max log(probability) occurs
+    return max(calculationDict,key=calculationDict.get)
+
+def predictWrap2(charMatrix):
+    result=[]
+    i=0
+    for utt in charMatrix:
+        result.append(Predict2(utt))
+        i+=1
+    return result
+
+"""
+run prediction on testSet
+data is in a list called testSetResult
+"""
+testSetResult=predictWrap2(testChar)
+
+"""
+ a function to test results
+a,b are lists of same size, report the err rate
+this function is used to test error rate between two prediction
+"""
+def diff(a,b):
+    err=0.0
+    for i in range(len(a)):
+        if(not a[i]==b[i]):err+=1
+    return err/len(a)
+""" output the csv file"""
+def CSVify(myList):
+    df=pd.DataFrame(myList)
+    df=df.rest_index()
+    df.to_csv('TestTfidfNoReweight.csv',header=['Id','Category'],index=False)
+
+
+"""Compare tfidf NB vs tfidf LogisticRegression"""
+dfLogi=pd.DataFrame.from_csv('submission.csv')
+#read the prediction data of LogisticRegression in dfLogi
+dfLogi=dfLogi['0']
+""" this is the difference between NB and Logistic Regression """
+diff(testSetResult,dfLogi)
