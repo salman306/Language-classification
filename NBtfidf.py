@@ -3,6 +3,7 @@ import start
 from scipy.stats import itemfreq
 import lr
 import pandas as pd
+import numpy as np
 # reminder of the mapping
 #mapping = {0: 'Slovak', 1: 'French', 2: 'Spanish', 3: 'German', 4: 'Polish'}
 # the tags are stored in start.y_train
@@ -14,8 +15,7 @@ tfidfTable=start.traincounts
 tfidfTable4Test=lr.testcounts
 TOTALTURN=len(tagArray)
 ALPHABETS=start.headings
-testx =pd.DataFrame.from_csv('test_set_x.csv')
-testChar=lr.cleaner(testx)
+testChar=lr.testform
 #function to get probability of Y_i's
 # return a dictionary {0:0.333,1:0.2222}  for example
 def getProbs_Yi():
@@ -38,7 +38,6 @@ total size of utterance for language=1 +sum(tfidf_Weights of 'a' for all languag
 """
 
 def getProbs_XjGivenYi():
-    ALPHABETS_SIZE=len(ALPHABETS)
     alphabetsFreqGivenYi=dict()
     for i in range(TOTALTURN):
         #cast the utterance charArray to set
@@ -63,19 +62,28 @@ def getProbs_XjGivenYi():
                 """
     #get rid off weight that is too small, they should be treated as noise
     #after careful examination 5 is chosen
-    weightCutoff=5
-    for k,v in alphabetsFreqGivenYi.iteritems():
-        for kk,vv in v.items():
-            if (vv<weightCutoff):del alphabetsFreqGivenYi[k][kk]
+    # weightCutoff=5
+    # for k,v in alphabetsFreqGivenYi.iteritems():
+    #     for kk,vv in v.items():
+    #         if (vv<weightCutoff):del alphabetsFreqGivenYi[k][kk]
 
     # re-weight with respect to the total alphabet of a language
 
     for k,v in alphabetsFreqGivenYi.iteritems():
+        tempVSum=sum(v.values())
         for kk,vv in v.items():
             #Laplace smoothing
-            alphabetsFreqGivenYi[k][kk]=(1.0+vv)/(sum(v.values())+tagCount[k])
+            alphabetsFreqGivenYi[k][kk]=(0.01+vv)/(tempVSum+tagCount[k])
+    #rescale so that prob (Xj=1:m|Yi)sums to 1
+    for k,v in alphabetsFreqGivenYi.iteritems():
+        tempVSum=sum(v.values())
+        for kk,vv in v.items():
+            #Laplace smoothing
+            alphabetsFreqGivenYi[k][kk]=vv/tempVSum
     return alphabetsFreqGivenYi
-probXjGivenYi=getProbs_XjGivenYi()
+# probXjGivenYi=getProbs_XjGivenYi()
+#probability is cached in file
+probXjGivenYi=np.load('probs.npy').item()
 #index is the index of the charArr of the whole testset, tfidfTest is the tfidfTable of the testset
 def Predict(charArr,index,tfidfTest):
     # make charArr contains unique chars since tf idf is already being considered
@@ -87,19 +95,25 @@ def Predict(charArr,index,tfidfTest):
             if (char in probXjGivenYi[k]):
                 #weight the charArray to be predicted by the the test tfidf weight
                 weight=tfidfTest[index].toarray()[0][ALPHABETS[char]]
-                print(weight)
-                tempSum+=start.np.log(weight*probXjGivenYi[k][char])
+                #deals with the situation when product is numerically 0 and thus log will fail
+                product=weight*probXjGivenYi[k][char]
+                if(product==0):
+                    product=0.01/(tagCount[k]+1)
+                tempSum+=start.np.log(product)
             else:
-                tempSum+=start.np.log(1.0/(tagCount[k]+sum(probXjGivenYi[k].values())))
+                # saves time by not doing summation since the summation will be 1
+                # tempSum+=start.np.log(1/(tagCount[k]+sum(probXjGivenYi[k].values())))
+                tempSum+=start.np.log(0.01/(tagCount[k]+1))
         calculationDict[k]=start.np.log(v)+tempSum
     # in prodcution mode,the line below should be commented out
-    print(calculationDict)
+    # print(calculationDict)
     # return the language index where max log(probability) occurs
     return max(calculationDict,key=calculationDict.get)
 def predictWrap(charMatrix,tTable):
     result=[]
     i=0
     for utt in charMatrix:
-        result.append(Predict(list(utt),i,tTable))
+        result.append(Predict(utt,i,tTable))
         i+=1
     return result
+t=predictWrap(testChar,tfidfTable4Test)

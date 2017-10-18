@@ -14,6 +14,7 @@ def cleaner(data):
     temp = []
     characterarrayfunc = []
     for utterance in data['Text']:
+        utterance=unicode(utterance,'utf-8')
         for counter in utterance:
             if ((counter != ' ') and (counter.isdigit() == False) and (counter != '.')):
                 if counter.isupper():
