@@ -42,24 +42,42 @@ def treeClassify(A,N):
         return N.Label
 
 def buildTree(X,Y,classCount,k):
-    # If Y contains a single class create a leaf node
-    for i in range(0,classCount):
-        if(sum(abs(Y-i)) == 0):
-            return Node(Label=i)
-    # Otherwise create a node and two children for the split data
-    if(len(Y) < 100):
-        classDist = []
+    n = Node(X,Y,k,classCount,np.ones([len(Y),1]))
+    Tree = [n]
+    leftToExpand = [n]
+    while len(leftToExpand) > 0:
+        # Split data with respect to first node in queue
+        sortLeft = leftToExpand[0].test(X)
+        sortRight = np.logical_not(sortLeft)
+        leftClasses = Y[sortLeft]
+        rightClasses = Y[sortRight]
+
+        leftIsLeaf = False
+        rightIsLeaf = False
+        # Left child is a leaf, create leaf and don't enqueue
         for i in range(0,classCount):
-            classDist.append(sum(Y == i))
-        return Node(Label=np.argmax(classDist))
-    n = Node(X,Y,k,classCount) 
-    div = n.test(X)
-    n.leftChild = buildTree(X[div],Y[div],classCount,k)
-    sortRight = np.logical_not(div)
-    n.rightChild = buildTree(X[sortRight],Y[sortRight],classCount,k)
-    n.leftChild.parent = n
-    n.rightChild.parent = n
-    return n
+            if(sum(abs(LeftClasses-i)) == 0 and not leftIsLeaf):
+                Tree.append(Node(Label=i))
+                leftIsLeaf = True
+        # Left child isn't leaf, so enqueue node
+        if(not leftIsLeaf):
+            n = Node(X,Y,k,classCount,sortLeft)
+            Tree.append(n)
+            leftToExpand.append(n)
+        # Right child is a leaf, create leaf and don't enqueue
+        for i in range(0,classCount):
+            if(sum(abs(RightClasses-i)) == 0 and not rightIsLeaf):
+                Tree.append(Node(Label=i))
+                rightIsLeaf = True
+        # Right child isn't leaf, so enqueue node
+        if(not rightIsLeaf):
+            n = Node(X,Y,k,classCount,sortRight)
+            Tree.append(n)
+            leftToExpand.append(n)
+        # Dequeue first node
+        leftToExpand = leftToExpand[1:]
+
+    return Tree
 
 
 class Node(object):
@@ -70,24 +88,25 @@ class Node(object):
         If Y is one class, Label is this class
         Intializes with the test function with highest information gain
     """
-    def __init__(self, X = None, Y = None, k = None, classCount = None, Label = None):
+    def __init__(self, X = None, Y = None, k = None, classCount = None, currentSamples = None, Label = None):
         self.leftChild = None
         self.rightChild = None
         self.parent = None
         self.Label = Label
+        self.currentSamples = currentSamples
         if(Label == None):
             self.Thresh, self.feature = findBestF(X,Y,k,classCount)
 
     def test(self,X):
         sortLabels = X[:,self.feature] < self.Thresh
-        return sortLabels
+        return np.dot(sortLabels.astype('int'),currentSamples.astype('int'))
 
 def findBestF(X,Y,k,classCount):
 
     samples,parameters = np.shape(X)
     # J = random.sample(range(parameters),k)
-    J = range(parameters)
-    A = np.sort(X[:,J],0)
+    # J = range(parameters)
+    A = np.sort(X[:,:200],0)
 
     Thresholds = (A[:-1,:] + A[1:,:])/2
 
