@@ -46,6 +46,7 @@ Note currently I cached the probability table in a file so that it is faster to 
 If you want to redesign the algo for prob table then u need to comment out line 90 and
 uncomment line 88 after u did something in getProbs_XjGivenYi funciton
 """
+languageSum=dict()
 def getProbs_XjGivenYi():
     alphabetsFreqGivenYi=dict()
     for i in range(TOTALTURN):
@@ -80,9 +81,10 @@ def getProbs_XjGivenYi():
 
     for k,v in alphabetsFreqGivenYi.iteritems():
         tempVSum=sum(v.values())
+        languageSum[k]=tempVSum
         for kk,vv in v.items():
             #Laplace smoothing
-            alphabetsFreqGivenYi[k][kk]=(0.01+vv)/(tempVSum+tagCount[k])
+            alphabetsFreqGivenYi[k][kk]=(1.0+vv)/(tempVSum+tagCount[k])
     #rescale so that prob (Xj=1:m|Yi)sums to 1
     for k,v in alphabetsFreqGivenYi.iteritems():
         tempVSum=sum(v.values())
@@ -91,8 +93,11 @@ def getProbs_XjGivenYi():
             alphabetsFreqGivenYi[k][kk]=vv/tempVSum
     return alphabetsFreqGivenYi
 # probXjGivenYi=getProbs_XjGivenYi()
+# np.save("probtfidf.npy",probXjGivenYi)
+# np.save("weightSumtfidf.npy",languageSum)
 #probability is cached in file
-probXjGivenYi=np.load('probs.npy').item()
+probXjGivenYi=np.load('probtfidf.npy').item()
+languageSum=np.load("weightSumtfidf.npy").item()
 #index is the index of the charArr of the whole testset, tfidfTest is the tfidfTable of the testset
 """the functions below are using tfidf re-weight on test set
     result not good, need investigation
@@ -110,12 +115,12 @@ def Predict(charArr,index,tfidfTest):
                 #deals with the situation when product is numerically 0 and thus log will fail
                 product=weight*probXjGivenYi[k][char]
                 if(product==0):
-                    product=0.01/(tagCount[k]+1)
+                    product=1.0/(tagCount[k]+languageSum[k])
                 tempSum+=start.np.log(product)
             else:
                 # saves time by not doing summation since the summation will be 1
                 # tempSum+=start.np.log(1/(tagCount[k]+sum(probXjGivenYi[k].values())))
-                tempSum+=start.np.log(0.01/(tagCount[k]+1))
+                tempSum+=start.np.log(1.0/(tagCount[k]+languageSum[k]))
         calculationDict[k]=start.np.log(v)+tempSum
     # in prodcution mode,the line below should be commented out
     # print(calculationDict)
@@ -129,6 +134,23 @@ def predictWrap(charMatrix,tTable):
         i+=1
     return result
 # t=predictWrap(testChar,tfidfTable4Test)
+def Sp_VS_Fr(characters):
+    setCharacters=set(characters)
+    SpScore=0
+    FrScore=0
+    for char in setCharacters:
+        if (probXjGivenYi[1].has_key(char)):
+            FrScore+=start.np.log(probXjGivenYi[1][char])
+        else:
+            FrScore+=start.np.log(1.0/(tagCount[1]+languageSum[1]))
+        if (probXjGivenYi[2].has_key(char)):
+            SpScore+=start.np.log(probXjGivenYi[2][char])
+        else:
+            SpScore+=start.np.log(1.0/(tagCount[2]+languageSum[2]))
+    if(SpScore>FrScore):
+        return 2
+    return 1
+
 
 """these functions below does not do use tfidf weight for prediction
 and are currently used
@@ -143,31 +165,32 @@ def Predict2(charArr):
             if (char in probXjGivenYi[k]):
                 product=probXjGivenYi[k][char]
                 if(product==0):
-                    product=0.01/(tagCount[k]+1)
+                    product=1.0/(tagCount[k]+languageSum[k])
                 tempSum+=start.np.log(product)
             else:
                 # saves time by not doing summation since the summation will be 1
                 # tempSum+=start.np.log(1/(tagCount[k]+sum(probXjGivenYi[k].values())))
-                tempSum+=start.np.log(0.01/(tagCount[k]+1))
+                tempSum+=start.np.log(1.0/(tagCount[k]+languageSum[k]))
         calculationDict[k]=start.np.log(v)+tempSum
     # in prodcution mode,the line below should be commented out
     # print(calculationDict)
     # return the language index where max log(probability) occurs
-    return max(calculationDict,key=calculationDict.get)
-
+    res= max(calculationDict,key=calculationDict.get)
+    if( (res==1 or res==2) and abs(calculationDict[1]-calculationDict[2])<0.0):
+        return Sp_VS_Fr(charArr)
+    return res
 def predictWrap2(charMatrix):
     result=[]
-    i=0
     for utt in charMatrix:
         result.append(Predict2(utt))
-        i+=1
     return result
 
 """
 run prediction on testSet
 data is in a list called testSetResult
 """
-testSetResult=predictWrap2(testChar)
+testSetResult2=predictWrap2(testChar)
+
 
 """
  a function to test results
@@ -180,10 +203,10 @@ def diff(a,b):
         if(not a[i]==b[i]):err+=1
     return err/len(a)
 """ output the csv file"""
-def CSVify(myList):
+def CSVify(myList,name):
     df=pd.DataFrame(myList)
-    df=df.rest_index()
-    df.to_csv('TestTfidfNoReweight.csv',header=['Id','Category'],index=False)
+    df=df.reset_index()
+    df.to_csv(name+'.csv',header=['Id','Category'],index=False)
 
 
 """Compare tfidf NB vs tfidf LogisticRegression"""
@@ -191,4 +214,5 @@ dfLogi=pd.DataFrame.from_csv('submission.csv')
 #read the prediction data of LogisticRegression in dfLogi
 dfLogi=dfLogi['0']
 """ this is the difference between NB and Logistic Regression """
-diff(testSetResult,dfLogi)
+print(diff(testSetResult2,dfLogi))
+CSVify(testSetResult2,'NoReweightWithDual0pcent')

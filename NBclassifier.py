@@ -10,13 +10,13 @@ import pandas as pd
 #i.e. tag for utterance index at 0 is start.y_train[0] or start.data['Target']
 #def main():
 TOTALTURN=len(start.data['Target'])
-# trainPartitionEnd=int(np.floor(0.75*TOTALTURN))
+trainPartitionEnd=int(np.floor(0.75*TOTALTURN))
 tagArray=start.data['Target']
 charArray=start.characterarray
-# # trainArr_x=charArray[:trainPartitionEnd]
-# crossArr_x=charArray[(trainPartitionEnd+1):]
-# trainArr_y=tagArray[:trainPartitionEnd]
-# crossArr_y=tagArray[(trainPartitionEnd+1):]
+trainArr_x=charArray[:trainPartitionEnd]
+crossArr_x=charArray[(trainPartitionEnd+1):]
+trainArr_y=tagArray[:trainPartitionEnd]
+crossArr_y=tagArray[(trainPartitionEnd+1):]
 
 testSet=lr.testform
 #function to get probability of Y_i's
@@ -30,8 +30,8 @@ def getProbs_Yi(inputArr):
     #P(Y_0)= typeProb[0]
     typeProb=dict((k,(v+0.0)/TOTALTURN) for k,v in typeCount.iteritems())
     return (typeCount,typeProb)
-# tagCount,tagProb=getProbs_Yi(trainArr_y)
-tagCount,tagProb=getProbs_Yi(tagArray)
+tagCount,tagProb=getProbs_Yi(trainArr_y)
+# tagCount,tagProb=getProbs_Yi(tagArray)
 languageCharCount=dict()
 def getProbs_XjGivenYi():
     alphabetsFreqGivenYi=dict()
@@ -63,10 +63,43 @@ def getProbs_XjGivenYi():
             #Laplace smoothing
             alphabetsFreqGivenYi[k][kk]=(1.0+vv)/(languageCharCount[k]+languageAlphabetLength)
     return alphabetsFreqGivenYi
-probXjGivenYi=getProbs_XjGivenYi()
+def getProbs_XjGivenYi_train():
+    alphabetsFreqGivenYi=dict()
+    for i in range(len(trainArr_x)):
+        #make the charList contain unique chars by turning them to set, note order is not preserved
+        tmp=set(trainArr_x[i])
+        templength=len(tmp)
+        #if the alphabetsFreqGivenYi[0:5] is not initiated with dictionary, then init with empty dict
+        if(not alphabetsFreqGivenYi.has_key(trainArr_y[i])):
+            alphabetsFreqGivenYi[trainArr_y[i]]=dict()
+            languageCharCount[trainArr_y[i]]=templength
+        else:
+            languageCharCount[trainArr_y[i]]+=templength
+        # for every char in an utterance count 1 appearance for the given language
+        for char in tmp:
+            if (alphabetsFreqGivenYi[trainArr_y[i]].has_key(char)):
+                alphabetsFreqGivenYi[trainArr_y[i]][char]+=1
+            else:
+                alphabetsFreqGivenYi[trainArr_y[i]][char]=1
+                """
+                the data will look like at this step:
+                alphabetsFreqGivenYi[0]={'a':200,'d':111}
+                alphabetsFreqGivenYi[1]={'e':200,'q':111}
+                """
+    # change them to probability
+    for k,v in alphabetsFreqGivenYi.iteritems():
+        languageAlphabetLength=len(v)
+        for kk,vv in v.iteritems():
+            #Laplace smoothing
+            alphabetsFreqGivenYi[k][kk]=(1.0+vv)/(languageCharCount[k]+languageAlphabetLength)
+    return alphabetsFreqGivenYi
+
+
+# probXjGivenYi=getProbs_XjGivenYi_train()
 # np.save("probCharBag.npy",probXjGivenYi)
-np.save("charCount.npy",languageCharCount)
-# probXjGivenYi=np.load('probCharBag.npy').item()
+# np.save("charCount.npy",languageCharCount)
+probXjGivenYi=np.load('probCharBag.npy').item()
+languageCharCount=np.load('charCount.npy').item()
 # probXjGivenYi=np.load('probs.npy').item()
 """
 if we have difficulty distinguishing Fr or Sp
@@ -78,14 +111,13 @@ def Sp_VS_Fr(characters):
     FrScore=0
     for char in setCharacters:
         if (probXjGivenYi[1].has_key(char)):
-            FrScore+=probXjGivenYi[1][char]
-        # else:
-        #     FrScore+=start.np.log(1.0/len(probXjGivenYi[1]))
-
+            FrScore+=start.np.log(probXjGivenYi[1][char])
+        else:
+            FrScore+=start.np.log(1.0/(languageCharCount[1]+len(probXjGivenYi[1])))
         if (probXjGivenYi[2].has_key(char)):
-            SpScore+=probXjGivenYi[2][char]
-        # else:
-        #     SpScore+=start.np.log(1.0/len(probXjGivenYi[2]))
+            SpScore+=start.np.log(probXjGivenYi[2][char])
+        else:
+            SpScore+=start.np.log(1.0/(languageCharCount[2]+len(probXjGivenYi[2])))
     if(SpScore>FrScore):
         return 2
     return 1
@@ -116,7 +148,7 @@ def Predict2(charArr):
                 tempSum+=start.np.log(1.0/(languageCharCount[k]+len(probXjGivenYi[k])))
         calculationDict[k]=start.np.log(v)+tempSum
     res=max(calculationDict,key=calculationDict.get)
-    if( (res==1 or res==2) and abs(calculationDict[1]-calculationDict[2])<0.8):
+    if( (res==1 or res==2) and abs(calculationDict[1]-calculationDict[2])<0.0):
         return Sp_VS_Fr(charArr)
     return res
 def predictWrap(charMatrix):
@@ -135,6 +167,7 @@ def CSVify(myList,name):
     df=df.reset_index()
 
     df.to_csv(name+'.csv',header=['Id','Category'],index=False)
-t=predictWrap(testSet)
+t=predictWrap(trainArr_x)
+val=predictWrap(crossArr_x)
 # diff(t,tagArray)
-CSVify(t,"trainSet_CharBagwithDual")
+# CSVify(t,"trainSet_CharBagwithDual40pcent")
