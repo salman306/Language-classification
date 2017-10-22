@@ -1,6 +1,10 @@
 import numpy as np
 import random
 from math import log, floor
+from multiprocessing.dummy import Pool as ThreadPool
+
+def mutli_run_wrapper(args):
+    return buildTree(*args)
 
 def getRandomForest(X,Y,K,classCount,M):
 
@@ -18,11 +22,16 @@ def getRandomForest(X,Y,K,classCount,M):
     
     # Get size of each bag
     bagSize = int(a/M)
+
+    pool = ThreadPool(M)
         
     # Divide data randomly into M bags and create random tree for each
+    args = []
     for m in range(M):
         bag = randPerm[m*bagSize:min((m+1)*bagSize,a-1)]
-        randomForest[m] = buildTree(X[bag,:],Y[bag],classCount,K)
+        args.append((X[bag,:],Y[bag],classCount,K))
+
+    randomForest = pool.map(buildTree,args)
         
     return randomForest
 
