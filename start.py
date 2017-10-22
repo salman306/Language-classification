@@ -28,6 +28,7 @@ temp = []
 characterarray = []
 alphabetSet=set()
 for utterance in data['Text']:
+    utterance=unicode(utterance,'utf-8')
     for counter in utterance:
         if ((counter != ' ') and (counter.isdigit() == False) and (counter != '.')):
             if counter.isupper():
@@ -42,7 +43,7 @@ alphabetSet=list(alphabetSet)
 alphabetSet.sort()
 alphabetMapping=dict()
 for i in range(len(alphabetSet)):
-    alphabetMapping[alphabetSet[i]]=i 
+    alphabetMapping[alphabetSet[i]]=i
 
 finalform = []
 for counter in characterarray:
