@@ -1,5 +1,3 @@
-import random
-
 def randomconverter(cleanstrings, targets):
 
     # inputs are array of cleaned utterances and their target categories
@@ -7,9 +5,9 @@ def randomconverter(cleanstrings, targets):
     newutt = []
     newtarget= []
     for count in range(len(cleanstrings)):
-        if (len(cleanstrings[count])>31):
+        if (len(cleanstrings[count])>21):
             noofnew = 3  # number of new utterances to create from large strings
-            noofelements = 30  # length of new randomly generated utterances
+            noofelements = 20  # length of new randomly generated utterances
 
         else:
             #for shorter utterances, just randomize them without creating additional ones
