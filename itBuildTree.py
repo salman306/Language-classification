@@ -68,7 +68,7 @@ def treeClassify(A,N):
     else:
         return N.Label
 
-def buildTree(X,Y,classCount,K):    
+def buildTree(X,Y,classCount,K=150):    
     global STD
     STD = np.std(X,0)
     Tree = Node(X,Y,K,classCount,np.ones([len(Y)]).astype('bool'))
@@ -83,14 +83,14 @@ def buildTree(X,Y,classCount,K):
         rightClasses = Y[sortRight]
 
         # If best funcion doesn't split well, make leaf
-        if(sum(sortRight) < 2):
+        if(sum(sortRight) == 0):
             classDist = []
             for i in range(0,classCount):
                     classDist.append(sum(leftClasses == i))
             N.Label = np.argmax(classDist)
             leftToExpand = leftToExpand[1:]
             continue
-        if(sum(sortLeft) < 2):
+        if(sum(sortLeft) == 0):
             classDist = []
             for i in range(0,classCount):
                     classDist.append(sum(rightClasses == i))
@@ -173,19 +173,20 @@ def findBestF(X,Y,k,classCount):
     bestDiv = []
 
     # Choose a random k parameters to consider
-    J = random.sample(range(parameters),k)
-    A = np.sort(X[:,J],0)
+    A = np.sort(X[:,range(k)],0)
 
     Thresholds = (A[:-1,:] + A[1:,:])/2
 
     for j in range(k):
         # Number of thresholds is 1/std for that column
-        if(STD[J[j]] == 0):
+        # If this feature has no variance, skip it
+        if(STD[j] == 0):
             continue
-        numOfThresh = int(1/max(STD[J[j]],1.0/(samples-1)))
+        numOfThresh = int(1/max(STD[j],1.0/(samples-1)))
         s = np.linspace(0,samples-2,numOfThresh,dtype=int)
         for i in range(numOfThresh):
-            sortLabels = np.array(X[:,J[j]] < Thresholds[s[i],j]).astype('int')
+            # 1 if sample is less than threshold, 0 o.w.
+            sortLabels = np.array(X[:,j] < Thresholds[s[i],j]).astype('int')
 
             HA = 0
             HB = 0 
@@ -197,7 +198,9 @@ def findBestF(X,Y,k,classCount):
             for y in range(0,classCount):
                 classTruth = np.array(Y == y).astype('int')
                 totalInClass = sum(classTruth)
+                # 1 if in class y and sorted left, then summed
                 pA = np.dot(classTruth,sortLabels)
+                # All other must be in class y and sorted right
                 pB = totalInClass - pA
                 if(pA == 0 or nA == 0):
                     HA += 0
@@ -212,7 +215,7 @@ def findBestF(X,Y,k,classCount):
 
             if(H < minH):
                 bestT = Thresholds[s[i],j]
-                bestF = J[j]
+                bestF = j
                 minH = H
     
     return bestT, bestF
