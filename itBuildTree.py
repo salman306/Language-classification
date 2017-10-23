@@ -1,7 +1,8 @@
 import numpy as np
 import random
 from math import log, floor
-from multiprocessing.dummy import Pool as ThreadPool
+from multiprocessing.dummy import Pool
+import os
 
 STD = 1
 
@@ -26,8 +27,8 @@ def getRandomForest(X,Y,K,classCount,M):
     # Get size of each bag
     bagSize = int(a/M)
         
-    pool = ThreadPool(M)
-        
+    pool = Pool(2)
+
     # Divide data randomly into M bags and create random tree for each
     args = []
     for m in range(M):
@@ -40,6 +41,7 @@ def getRandomForest(X,Y,K,classCount,M):
 
 def forestClassify(X,F,classCount):
     yhat = []
+    R = np.zeros([X.shape[0],len(F)])
     for i in range(len(F)):
         R[:,i] = treeClassify(X,F[i])
     # 
@@ -70,8 +72,10 @@ def buildTree(X,Y,classCount,K):
     global STD
     STD = np.std(X,0)
     Tree = Node(X,Y,K,classCount,np.ones([len(Y)]).astype('bool'))
+    # Breadth first order
     leftToExpand = [Tree]
     while len(leftToExpand) > 0:
+        print(str(len(leftToExpand)) + ' (PID ' + str(os.getpid()) + ')')
         N = leftToExpand[0]
         # Split data with respect to first node in queue
         sortLeft,sortRight = leftToExpand[0].test(X)
@@ -79,14 +83,14 @@ def buildTree(X,Y,classCount,K):
         rightClasses = Y[sortRight]
 
         # If best funcion doesn't split well, make leaf
-        if(sum(sortRight) == 0):
+        if(sum(sortRight) < 2):
             classDist = []
             for i in range(0,classCount):
                     classDist.append(sum(leftClasses == i))
             N.Label = np.argmax(classDist)
             leftToExpand = leftToExpand[1:]
             continue
-        if(sum(sortLeft) == 0):
+        if(sum(sortLeft) < 2):
             classDist = []
             for i in range(0,classCount):
                     classDist.append(sum(rightClasses == i))
@@ -137,9 +141,12 @@ class Node(object):
         self.parent = None
         self.Label = Label
         if(Label == None):
+            # Claculate information gain - maximial feature and threshold
             self.currentSamples = currentSamples
             self.Thresh, self.feature = findBestF(X[currentSamples],Y[currentSamples],k,classCount)
     def test(self,X):
+        # Sort all samples w.r.t. feature and threshold. Then take subset of example that are
+        # actually at this node during constuction 
         sortLabels = X[:,self.feature] < self.Thresh
         right = np.logical_not(sortLabels)
         sortLeft = []
@@ -153,6 +160,7 @@ class Node(object):
         return sortLeft.astype('bool'), sortRight.astype('bool')
 
     def sortTest(self,X):
+        # Simply return thresholded array
         sortLabels = X[:,self.feature] < self.Thresh
         return sortLabels
 
